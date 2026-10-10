@@ -171,6 +171,8 @@ model BusinessCard {
   accentColor     String       @default("#00B6B2")
   customActions   String?      // JSON array: [{ label, labelAr, url, icon, type }]
   socialLinks     String?      // JSON: { linkedin, instagram, x, snapchat, tiktok }
+  walletLocations String?      // JSON array: [{ id, name, nameAr, type, latitude, longitude, relevantText, relevantTextAr, address }]
+  walletDesign    String?      // JSON: { theme, passType, headerText, crNumber, bookingUrl }
   qrCodeUrl       String?
   isPrimary       Boolean      @default(false)
   isPublished     Boolean      @default(true)

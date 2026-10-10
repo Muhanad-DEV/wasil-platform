@@ -118,8 +118,10 @@ export async function POST(req: NextRequest) {
         theme: theme || 'navy-violet',
         primaryColor: primaryColor || '#181D48',
         accentColor: accentColor || '#00B6B2',
-        customActions: customActions ? JSON.stringify(customActions) : null,
-        socialLinks: socialLinks ? JSON.stringify(socialLinks) : null,
+        customActions: customActions ? (typeof customActions === 'string' ? customActions : JSON.stringify(customActions)) : null,
+        socialLinks: socialLinks ? (typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks)) : null,
+        walletLocations: body.walletLocations ? (typeof body.walletLocations === 'string' ? body.walletLocations : JSON.stringify(body.walletLocations)) : null,
+        walletDesign: body.walletDesign ? (typeof body.walletDesign === 'string' ? body.walletDesign : JSON.stringify(body.walletDesign)) : null,
         isPublished: true,
       },
     });

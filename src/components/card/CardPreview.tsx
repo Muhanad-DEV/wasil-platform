@@ -22,6 +22,9 @@ import {
   X,
   Sparkles,
   ArrowRight,
+  Bell,
+  Building2,
+  Hotel,
 } from 'lucide-react';
 
 export interface CardPreviewData {
@@ -50,6 +53,8 @@ export interface CardPreviewData {
   accentColor?: string;
   customActions?: string | null; // JSON string
   socialLinks?: string | null; // JSON string
+  walletLocations?: string | any[] | null;
+  walletDesign?: string | Record<string, any> | null;
 }
 
 interface CardPreviewProps {
@@ -85,6 +90,17 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
     }
   } catch (e) {
     customActionsList = [];
+  }
+
+  let locationsList: any[] = [];
+  try {
+    if (card.walletLocations) {
+      locationsList = typeof card.walletLocations === 'string'
+        ? JSON.parse(card.walletLocations)
+        : card.walletLocations;
+    }
+  } catch (e) {
+    locationsList = [];
   }
 
   const handleShare = () => {
@@ -293,6 +309,48 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
           </div>
         )}
 
+        {/* Linked Projects & Hotels (Geofence Lock Screen Alert Active) */}
+        {locationsList.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-wasil-border/70 bg-gradient-to-br from-wasil-bg/60 to-white p-3 text-start shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-wasil-navy">
+                <Bell className="h-3.5 w-3.5 text-wasil-turquoise animate-pulse" />
+                <span>{lang === 'ar' ? 'المشاريع والفنادق المرتبطة' : 'Linked Projects & Hotels'}</span>
+              </div>
+              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[8px] font-black text-emerald-600 border border-emerald-500/20">
+                {lang === 'ar' ? 'تنبيه الموقع مفعّل' : 'Geofence Active'}
+              </span>
+            </div>
+
+            <div className="space-y-1.5">
+              {locationsList.map((loc: any, idx: number) => {
+                const locName = lang === 'ar' && loc.nameAr ? loc.nameAr : loc.name;
+                const locAddress = loc.address || `${loc.latitude}, ${loc.longitude}`;
+                return (
+                  <a
+                    key={idx}
+                    href={`https://maps.google.com/?q=${loc.latitude},${loc.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-xl bg-white p-2 border border-wasil-border/50 text-[11px] text-wasil-navy hover:border-wasil-violet/40 transition-colors group"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-wasil-bg text-wasil-navy shrink-0">
+                        {loc.type === 'HOTEL' ? <Hotel className="h-3 w-3 text-wasil-amber" /> : <Building2 className="h-3 w-3 text-wasil-violet" />}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold truncate">{locName}</div>
+                        <div className="text-[9px] text-wasil-muted truncate">{locAddress}</div>
+                      </div>
+                    </div>
+                    <MapPin className="h-3 w-3 text-wasil-muted group-hover:text-wasil-turquoise shrink-0" />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Footer info in phone preview */}
         <div className="mt-5 border-t border-wasil-border/60 pt-3 text-center">
           <span className="text-[10px] text-wasil-muted">
@@ -387,6 +445,33 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
                 </div>
               </div>
             </div>
+
+            {/* Lock Screen Geofence Alert Preview */}
+            {locationsList.length > 0 && (
+              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/40 p-3 my-2.5 text-start">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
+                    <Bell className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                    <span>{lang === 'ar' ? 'إشعار شاشة القفل عند الاقتراب (Geofence)' : 'Lock Screen Geofence Alert'}</span>
+                  </div>
+                  <span className="rounded bg-emerald-400 text-slate-950 text-[8px] font-black px-1.5 py-0.2">
+                    {lang === 'ar' ? 'تلقائي' : 'Auto'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-white/80 leading-relaxed mb-2">
+                  {lang === 'ar'
+                    ? 'ستظهر البطاقة تلقائياً على شاشة قفل الآيفون عند التواجد بالقرب من أي من هذه المواقع:'
+                    : 'The pass automatically lights up on iPhone lock screen when near:'}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {locationsList.map((loc: any, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 rounded-lg bg-white/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-300 border border-white/10">
+                      {loc.type === 'HOTEL' ? '🏨' : '🏢'} {lang === 'ar' && loc.nameAr ? loc.nameAr : loc.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Smart Actions List */}
             <div className="mt-4 space-y-2.5">

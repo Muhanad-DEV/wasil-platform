@@ -42,21 +42,70 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
     const cleanId = (card.id || card.slug).replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase();
     const serialNumber = `WSL-APL-${cleanId}`;
 
+    let parsedLocations: any[] = [];
+    try {
+      if (card.walletLocations) {
+        parsedLocations = typeof card.walletLocations === 'string'
+          ? JSON.parse(card.walletLocations)
+          : card.walletLocations;
+      }
+    } catch (e) {
+      parsedLocations = [];
+    }
+
+    let parsedDesign: any = {};
+    try {
+      if (card.walletDesign) {
+        parsedDesign = typeof card.walletDesign === 'string'
+          ? JSON.parse(card.walletDesign)
+          : card.walletDesign;
+      }
+    } catch (e) {
+      parsedDesign = {};
+    }
+
+    // If no locations configured on custom card, provide default project/hotel coordinates
+    if (parsedLocations.length === 0) {
+      parsedLocations = [
+        {
+          name: 'Al Mouj Muscat Marina',
+          nameAr: 'مارينا الموج مسقط',
+          type: 'PROJECT',
+          latitude: 23.6263,
+          longitude: 58.2612,
+          relevantText: `مرحباً بك في مشروع الموج مسقط! اضغط لفتح بطاقة ${card.ownerNameAr || card.ownerName}`,
+        },
+        {
+          name: 'The St. Regis Al Mouj Resort',
+          nameAr: 'منتجع سانت ريجيس الموج مسقط',
+          type: 'HOTEL',
+          latitude: 23.6295,
+          longitude: 58.2678,
+          relevantText: `أنت بالقرب من سانت ريجيس مسقط! تواصل مع ${card.ownerNameAr || card.ownerName}`,
+        },
+      ];
+    }
+
     const { buffer, isSimulated } = await generateAppleWalletPass({
       serialNumber,
       cardTitle: card.title || card.ownerName,
       ownerName: card.ownerName,
       ownerNameAr: card.ownerNameAr,
       jobTitle: card.jobTitle,
+      jobTitleAr: card.jobTitleAr,
       companyName: card.companyName,
       companyNameAr: card.companyNameAr,
       phone: card.phone,
+      whatsapp: card.whatsapp,
       email: card.email,
       website: card.website,
       barcodeUrl: cardUrl,
-      primaryColor: card.primaryColor || '#181D48',
-      backgroundColor: card.primaryColor || '#181D48',
-      type: 'BUSINESS_CARD',
+      primaryColor: parsedDesign.primaryColor || card.primaryColor || '#181D48',
+      backgroundColor: parsedDesign.primaryColor || card.primaryColor || '#181D48',
+      type: (parsedDesign.passType as any) || 'BUSINESS_CARD',
+      locations: parsedLocations,
+      crNumber: parsedDesign.crNumber || 'CR: 1084920 / RERA OM',
+      bookingUrl: parsedDesign.bookingUrl || `${baseUrl}/c/${card.slug}`,
     });
 
     // Non-fatal recording in DB

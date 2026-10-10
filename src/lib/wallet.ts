@@ -3,23 +3,41 @@ import JSZip from 'jszip';
 import jwt from 'jsonwebtoken';
 import QRCode from 'qrcode';
 
+export interface PassLocation {
+  id?: string;
+  name?: string;
+  nameAr?: string;
+  type?: 'PROJECT' | 'HOTEL' | 'OFFICE' | 'RETAIL' | 'BRANCH';
+  latitude: number;
+  longitude: number;
+  relevantText?: string;
+  relevantTextAr?: string;
+  address?: string;
+}
+
 export interface WalletPassConfig {
   serialNumber: string;
   cardTitle: string;
   ownerName: string;
   ownerNameAr?: string | null;
   jobTitle: string;
+  jobTitleAr?: string | null;
   companyName: string;
   companyNameAr?: string | null;
   phone: string;
+  whatsapp?: string | null;
   email: string;
   website?: string | null;
   barcodeUrl: string;
   primaryColor?: string; // hex
   backgroundColor?: string;
-  type?: 'BUSINESS_CARD' | 'LOYALTY_CARD';
+  type?: 'BUSINESS_CARD' | 'LOYALTY_CARD' | 'EVENT_TICKET';
   points?: number;
   tier?: string;
+  locations?: PassLocation[]; // Linked project / hotel geofence coordinates
+  designTheme?: string;
+  crNumber?: string | null;
+  bookingUrl?: string | null;
 }
 
 export interface WalletIntegrationStatus {
@@ -64,6 +82,20 @@ export async function generateAppleWalletPass(config: WalletPassConfig): Promise
 }> {
   const status = getWalletIntegrationStatus();
 
+  // Prepare GPS locations for Apple Wallet geofencing & Lock Screen alerts (up to 10 coordinates supported by Apple PassKit)
+  const passLocations = (config.locations || [])
+    .filter((l) => typeof l.latitude === 'number' && typeof l.longitude === 'number')
+    .slice(0, 10)
+    .map((loc) => ({
+      latitude: Number(loc.latitude),
+      longitude: Number(loc.longitude),
+      relevantText: (
+        loc.relevantText ||
+        loc.relevantTextAr ||
+        (loc.name ? `Welcome to ${loc.name}! Tap to open ${config.ownerName}'s pass` : `Near ${config.companyName}`)
+      ).slice(0, 128),
+    }));
+
   // If custom Apple Developer certificates are not configured locally,
   // request an authentic, cryptographically signed pass from the Apple WWDR signing service.
   // This delivers a valid PKCS#7 signature issued by Apple Worldwide Developer Relations Certification Authority,
@@ -90,21 +122,27 @@ export async function generateAppleWalletPass(config: WalletPassConfig): Promise
         ? `${config.tier || 'SILVER'} • ${config.points || 0} pts`
         : (config.jobTitle ? `${config.jobTitle} - ${config.companyName}` : config.companyName);
 
+      const signPayload: Record<string, unknown> = {
+        barcodeValue: config.barcodeUrl,
+        barcodeFormat: 'QR',
+        title: passTitle,
+        label: labelText,
+        value: valueText,
+        colorPreset,
+        webOrigin: 'https://walletwallet.alen.ro',
+      };
+
+      if (passLocations.length > 0) {
+        signPayload.locations = passLocations;
+      }
+
       const signRes = await fetch('https://v2-walletwallet-alen-ro-api.workers2000.workers.dev/api/pkpass', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Origin': 'https://walletwallet.alen.ro',
         },
-        body: JSON.stringify({
-          barcodeValue: config.barcodeUrl,
-          barcodeFormat: 'QR',
-          title: passTitle,
-          label: labelText,
-          value: valueText,
-          colorPreset,
-          webOrigin: 'https://walletwallet.alen.ro',
-        }),
+        body: JSON.stringify(signPayload),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -234,13 +272,53 @@ export async function generateAppleWalletPass(config: WalletPassConfig): Promise
           label: 'WEBSITE / الموقع الإلكتروني',
           value: config.website || 'https://wasil.om',
         },
+        ...(config.whatsapp || config.phone
+          ? [
+              {
+                key: 'whatsapp',
+                label: 'WHATSAPP / واتساب',
+                value: `https://wa.me/${(config.whatsapp || config.phone).replace(/[^0-9]/g, '')}`,
+              },
+            ]
+          : []),
+        ...(config.bookingUrl
+          ? [
+              {
+                key: 'booking',
+                label: 'BOOK APPOINTMENT / حجز موعد',
+                value: config.bookingUrl,
+              },
+            ]
+          : []),
+        ...(config.crNumber
+          ? [
+              {
+                key: 'license',
+                label: 'COMMERCIAL CR & LICENSE / السجل والترخيص',
+                value: config.crNumber,
+              },
+            ]
+          : []),
+        ...(passLocations.length > 0
+          ? [
+              {
+                key: 'geofence',
+                label: 'LINKED PROJECTS & HOTELS / المشاريع والفنادق المربوطة',
+                value: `${(config.locations || []).map((l) => l.name || l.nameAr).join(' • ')} (Nearby lock-screen alert enabled)`,
+              },
+            ]
+          : []),
         {
           key: 'notes',
           label: 'DIGITAL IDENTITY / الهوية الرقمية',
-          value: 'Official Verified Business Card issued via Wasil Platform (سلطنة عُمان).',
+          value: 'Official Verified Business Card issued via Wasil Platform (سلطنة عُمان - wasil.om).',
         },
       ],
     };
+  }
+
+  if (passLocations.length > 0) {
+    passJson.locations = passLocations;
   }
 
   const passJsonBuffer = Buffer.from(JSON.stringify(passJson, null, 2), 'utf-8');

@@ -86,6 +86,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         accentColor: accentColor !== undefined ? accentColor : existing.accentColor,
         customActions: customActions !== undefined ? (typeof customActions === 'string' ? customActions : JSON.stringify(customActions)) : existing.customActions,
         socialLinks: socialLinks !== undefined ? (typeof socialLinks === 'string' ? socialLinks : JSON.stringify(socialLinks)) : existing.socialLinks,
+        walletLocations: body.walletLocations !== undefined ? (typeof body.walletLocations === 'string' ? body.walletLocations : JSON.stringify(body.walletLocations)) : existing.walletLocations,
+        walletDesign: body.walletDesign !== undefined ? (typeof body.walletDesign === 'string' ? body.walletDesign : JSON.stringify(body.walletDesign)) : existing.walletDesign,
         branchId: branchId !== undefined ? branchId : existing.branchId,
         isPublished: isPublished !== undefined ? isPublished : existing.isPublished,
       },

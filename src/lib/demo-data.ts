@@ -21,6 +21,8 @@ export interface FallbackCard {
   organizationId: string;
   isPublished: boolean;
   avatarUrl?: string;
+  walletLocations?: any;
+  walletDesign?: any;
   organization?: {
     id: string;
     slug: string;
@@ -56,6 +58,43 @@ export const FALLBACK_CARDS: Record<string, FallbackCard> = {
     organizationId: 'cmv2k95tb000710gg2qx2vgze',
     isPublished: true,
     avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
+    walletLocations: [
+      {
+        id: 'loc-almouj-marina',
+        name: 'Al Mouj Muscat Marina',
+        nameAr: 'مارينا الموج مسقط',
+        type: 'PROJECT',
+        latitude: 23.6263,
+        longitude: 58.2612,
+        address: 'Al Mouj Marina, Muscat',
+        relevantText: 'مرحباً بك في مشروع الموج مسقط! اضغط للتواصل مع أحمد البلوشي لحجز فيلتك',
+      },
+      {
+        id: 'loc-stregis-almouj',
+        name: 'The St. Regis Al Mouj Resort',
+        nameAr: 'منتجع سانت ريجيس الموج مسقط',
+        type: 'HOTEL',
+        latitude: 23.6295,
+        longitude: 58.2678,
+        address: 'The St. Regis Al Mouj, Muscat',
+        relevantText: 'أنت بالقرب من سانت ريجيس الموج! تواصل مع مستشار العقارات أحمد البلوشي',
+      },
+      {
+        id: 'loc-muscat-bay',
+        name: 'Muscat Bay Resort & Residences',
+        nameAr: 'مشروع خليج مسقط',
+        type: 'PROJECT',
+        latitude: 23.5482,
+        longitude: 58.6521,
+        address: 'Bandar Jissah, Muscat',
+        relevantText: 'أنت بالقرب من مشروع خليج مسقط! استكشف الفلل الشاطئية الحصرية مع أحمد البلوشي',
+      },
+    ],
+    walletDesign: {
+      theme: 'royal-slate',
+      passType: 'BUSINESS_CARD',
+      crNumber: 'CR: 1084920 / RERA OM-2026',
+    },
     organization: {
       id: 'cmv2k95tb000710gg2qx2vgze',
       slug: 'al-mouj-muscat',
@@ -88,6 +127,33 @@ export const FALLBACK_CARDS: Record<string, FallbackCard> = {
     organizationId: 'cmv2k95tb000710gg2qx2vgze',
     isPublished: true,
     avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
+    walletLocations: [
+      {
+        id: 'loc-jumeirah-muscat',
+        name: 'Jumeirah Muscat Bay',
+        nameAr: 'فندق جميرا خليج مسقط',
+        type: 'HOTEL',
+        latitude: 23.5490,
+        longitude: 58.6535,
+        address: 'Muscat Bay, Bandar Jissah',
+        relevantText: 'مرحباً بك في جميرا خليج مسقط! تواصل مع فاطمة الحارثية للاستشارات الاستثمارية',
+      },
+      {
+        id: 'loc-mall-of-oman',
+        name: 'Mall of Oman Business Center',
+        nameAr: 'مول عُمان - مركز الأعمال',
+        type: 'OFFICE',
+        latitude: 23.5786,
+        longitude: 58.4069,
+        address: 'Bawshar, Muscat',
+        relevantText: 'أنت بالقرب من مركز مبيعاتنا في مول عُمان! تفضل بزيارة مكتبنا',
+      },
+    ],
+    walletDesign: {
+      theme: 'luxury-gold',
+      passType: 'BUSINESS_CARD',
+      crNumber: 'CR: 1084920 / RERA OM-2026',
+    },
     organization: {
       id: 'cmv2k95tb000710gg2qx2vgze',
       slug: 'al-mouj-muscat',
