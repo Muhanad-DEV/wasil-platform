@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateQRCodeDataUrl, generateQRCodeSvg } from '@/lib/qrcode';
+import { getFallbackCard } from '@/lib/demo-data';
 import QRCode from 'qrcode';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const card = await prisma.businessCard.findFirst({
-      where: {
-        OR: [{ id: params.id }, { slug: params.id }],
-      },
-    });
+    let card: any = null;
 
-    if (!card) return NextResponse.json({ error: 'Card not found' }, { status: 404 });
+    try {
+      card = await prisma.businessCard.findFirst({
+        where: {
+          OR: [{ id: params.id }, { slug: params.id }],
+        },
+      });
+    } catch (dbError) {
+      console.warn('[QR API] Database query failed or unavailable, using fallback:', dbError);
+    }
+
+    if (!card) {
+      card = getFallbackCard(params.id);
+    }
 
     const searchParams = req.nextUrl.searchParams;
     const format = searchParams.get('format') || 'dataurl'; // dataurl, svg, png
     const fgColor = searchParams.get('fgColor') || card.primaryColor || '#181D48';
     const bgColor = searchParams.get('bgColor') || '#FFFFFF';
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const host = req.headers.get('host') || 'wasilom.netlify.app';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
     const targetUrl = `${baseUrl}/c/${card.slug}`;
 
     if (format === 'svg') {
@@ -61,15 +72,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       url: targetUrl,
       fgColor,
       bgColor,
-      width: 500,
     });
 
     return NextResponse.json({
+      success: true,
       dataUrl,
-      targetUrl,
-      slug: card.slug,
+      url: targetUrl,
+      cardTitle: card.title || card.ownerName,
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'QR generation failed' }, { status: 500 });
   }
 }

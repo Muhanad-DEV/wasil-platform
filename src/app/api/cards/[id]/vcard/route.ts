@@ -1,34 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateVCardString } from '@/lib/vcard';
+import { getFallbackCard } from '@/lib/demo-data';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const card = await prisma.businessCard.findFirst({
-      where: {
-        OR: [{ id: params.id }, { slug: params.id }],
-      },
-      include: { organization: true },
-    });
+    let card: any = null;
 
-    if (!card) {
-      return NextResponse.json({ error: 'Card not found' }, { status: 404 });
+    try {
+      card = await prisma.businessCard.findFirst({
+        where: {
+          OR: [{ id: params.id }, { slug: params.id }],
+        },
+        include: { organization: true },
+      });
+    } catch (dbError) {
+      console.warn('[vCard API] Database query failed or unavailable, using fallback:', dbError);
     }
 
-    // Record save contact event
-    await prisma.businessCard.update({
-      where: { id: card.id },
-      data: { saveContactCount: { increment: 1 } },
-    });
+    if (!card) {
+      card = getFallbackCard(params.id);
+    }
 
-    await prisma.analyticsEvent.create({
-      data: {
-        organizationId: card.organizationId,
-        cardId: card.id,
-        eventType: 'VCARD_DOWNLOAD',
-        device: 'MOBILE',
-      },
-    });
+    // Non-fatal recording in DB
+    try {
+      if (card.id && !card.id.startsWith('card-')) {
+        await prisma.businessCard.update({
+          where: { id: card.id },
+          data: { saveContactCount: { increment: 1 } },
+        });
+
+        await prisma.analyticsEvent.create({
+          data: {
+            organizationId: card.organizationId,
+            cardId: card.id,
+            eventType: 'VCARD_DOWNLOAD',
+            device: 'MOBILE',
+          },
+        });
+      }
+    } catch (writeErr) {
+      console.warn('[vCard API] Non-fatal analytics write skipped:', writeErr);
+    }
 
     const vCardText = generateVCardString({
       name: card.ownerName,
@@ -46,16 +59,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       bio: card.bio,
     });
 
-    const fileName = `${card.ownerName.replace(/[^a-zA-Z0-9_-]/g, '_')}_contact.vcf`;
+    const safeName = (card.ownerName || 'contact').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName = `${safeName}_contact.vcf`;
 
     return new NextResponse(vCardText, {
       status: 200,
       headers: {
         'Content-Type': 'text/vcard; charset=utf-8',
         'Content-Disposition': `attachment; filename="${fileName}"`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
       },
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'vCard generation failed' }, { status: 500 });
   }
 }
