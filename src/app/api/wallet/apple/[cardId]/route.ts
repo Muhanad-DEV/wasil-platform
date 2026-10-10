@@ -5,12 +5,13 @@ import { getFallbackCard } from '@/lib/demo-data';
 
 export async function GET(req: NextRequest, { params }: { params: { cardId: string } }) {
   try {
+    const rawCardId = decodeURIComponent(params.cardId || '').replace(/\.pkpass$/i, '').trim();
     let card: any = null;
 
     try {
       card = await prisma.businessCard.findFirst({
         where: {
-          OR: [{ id: params.cardId }, { slug: params.cardId }],
+          OR: [{ id: rawCardId }, { slug: rawCardId }],
         },
         include: { organization: true },
       });
@@ -19,18 +20,18 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
     }
 
     if (!card) {
-      card = getFallbackCard(params.cardId);
+      card = getFallbackCard(rawCardId);
     }
 
     const searchParams = req.nextUrl.searchParams;
-    const isDirectDownload = searchParams.get('download') === '1' || searchParams.get('format') === 'pkpass';
+    const isPkpassPath = params.cardId.toLowerCase().endsWith('.pkpass');
+    const isDirectDownload = isPkpassPath || searchParams.get('download') === '1' || searchParams.get('format') === 'pkpass';
     const acceptHeader = req.headers.get('accept') || '';
 
-    // If an end-user navigates directly in Safari browser without explicit download intent,
-    // redirect them to the interactive card page with wallet modal open so Safari never throws
-    // the generic "Safari cannot download this file" rejection popup.
+    // If an end-user navigates directly in browser address bar without explicit download intent or .pkpass extension,
+    // redirect them to the interactive card page with wallet modal open so Safari never throws a generic error.
     if (!isDirectDownload && acceptHeader.includes('text/html')) {
-      const targetSlug = card.slug || params.cardId;
+      const targetSlug = card.slug || rawCardId;
       return NextResponse.redirect(new URL(`/c/${targetSlug}?wallet=apple`, req.url));
     }
 
@@ -102,6 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
       headers: {
         'Content-Type': 'application/vnd.apple.pkpass',
         'Content-Disposition': `attachment; filename="${fileName}"`,
+        'X-Wasil-Wallet-Signed': isSimulated ? 'false' : 'true',
         'X-Wasil-Wallet-Simulated': isSimulated ? 'true' : 'false',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
       },

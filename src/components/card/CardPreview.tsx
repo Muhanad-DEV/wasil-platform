@@ -21,6 +21,7 @@ import {
   Copy,
   X,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 
 export interface CardPreviewData {
@@ -388,78 +389,72 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
             </div>
 
             {/* Smart Actions List */}
-            <div className="mt-4 space-y-2">
-              {/* Option 1: Native 1-Tap iOS Contact Card (Opens native Apple Contacts sheet) */}
+            <div className="mt-4 space-y-2.5">
+              {/* Option 1: Direct Apple Wallet Pass (Signed with Apple WWDR CA - Opens native PassKit sheet) */}
               <a
-                href={`/api/cards/${card.id || card.slug}/vcard`}
-                download
-                className="w-full flex items-center justify-between rounded-xl bg-wasil-violet p-3 text-white hover:bg-wasil-violet/90 transition-all shadow-md group"
+                href={`/api/wallet/apple/${card.slug || card.id}.pkpass`}
+                className="w-full flex items-center justify-between rounded-2xl bg-gradient-to-r from-neutral-900 to-black p-3.5 text-white hover:border-white/40 transition-all border border-white/25 shadow-lg group"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white shrink-0">
-                    <Smartphone className="h-4 w-4" />
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-white shrink-0">
+                    <span className="text-xl font-bold"></span>
                   </div>
                   <div className="text-start">
                     <div className="text-xs font-black flex items-center gap-1.5">
-                      <span>{lang === 'ar' ? 'حفظ جهة الاتصال في الآيفون (موصى به)' : 'Save to iPhone Contacts (1-Tap)'}</span>
-                      <span className="rounded bg-emerald-400 text-slate-900 text-[8px] font-black px-1.5 py-0.2 uppercase">
+                      <span>{lang === 'ar' ? 'إضافة إلى محفظة Apple Wallet' : 'Add to Apple Wallet'}</span>
+                      <span className="rounded bg-emerald-400 text-slate-950 text-[8px] font-black px-1.5 py-0.5">
+                        {lang === 'ar' ? 'موقّع رسمي' : 'Signed'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/70 block mt-0.5">
+                      {lang === 'ar'
+                        ? 'يفتح نافذة Apple Wallet في سفاري لحفظ البطاقة ورمز QR في المحفظة.'
+                        : 'Opens native iOS Wallet pass to save card and QR directly in Wallet.'}
+                    </span>
+                  </div>
+                </div>
+                <ArrowRight className={`h-4 w-4 text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0 ${isRtl ? 'rotate-180' : ''}`} />
+              </a>
+
+              {/* Option 2: Native 1-Tap iOS Contact Card (Opens native Apple Contacts sheet) */}
+              <a
+                href={`/api/cards/${card.id || card.slug}/vcard`}
+                download
+                className="w-full flex items-center justify-between rounded-2xl bg-wasil-violet p-3.5 text-white hover:bg-wasil-violet/90 transition-all shadow-md group border border-wasil-violet/50"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 text-white shrink-0">
+                    <Smartphone className="h-5 w-5" />
+                  </div>
+                  <div className="text-start">
+                    <div className="text-xs font-black flex items-center gap-1.5">
+                      <span>{lang === 'ar' ? 'حفظ جهة الاتصال في الآيفون (1-Tap)' : 'Save to iPhone Contacts (1-Tap)'}</span>
+                      <span className="rounded bg-wasil-turquoise text-slate-950 text-[8px] font-black px-1.5 py-0.5 uppercase">
                         {lang === 'ar' ? 'فوري' : 'Instant'}
                       </span>
                     </div>
-                    <span className="text-[10px] text-white/80 block">
+                    <span className="text-[10px] text-white/80 block mt-0.5">
                       {lang === 'ar'
-                        ? 'يفتح بطاقة الآيفون الرسمية لحفظ الاسم، الهاتف، الواتساب والبريد.'
-                        : 'Opens native iOS Contact card to save number, photo, and WhatsApp.'}
+                        ? 'حفظ الاسم، الصورة، الهاتف، الواتساب والبريد مباشرة في جهات الاتصال.'
+                        : 'Saves full contact, phone, WhatsApp and email to iPhone Contacts.'}
                     </span>
                   </div>
                 </div>
                 <Download className="h-4 w-4 text-white/70 group-hover:text-white shrink-0" />
               </a>
 
-              {/* Option 2: Apple Wallet direct .pkpass file */}
-              <a
-                href={`/api/wallet/apple/${card.id || card.slug}?download=1`}
-                download
-                className="w-full flex items-center justify-between rounded-xl border border-white/20 bg-white/5 p-3 text-white hover:bg-white/10 transition-colors group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white shrink-0">
-                    <span className="text-base font-bold"></span>
-                  </div>
-                  <div className="text-start">
-                    <div className="text-xs font-bold">
-                      {lang === 'ar' ? 'تحميل بطاقة Wallet المباشرة (.pkpass)' : 'Download .pkpass Wallet File'}
-                    </div>
-                    <span className="text-[10px] text-white/60 block">
-                      {lang === 'ar' ? 'حفظ الملف في تطبيق الملفات (Files) أو مشاركته.' : 'Save to Files app or AirDrop to Mac/iPad.'}
-                    </span>
-                  </div>
+              {/* Option 3: Add to Home Screen Instructions */}
+              <div className="w-full rounded-2xl border border-white/10 bg-white/5 p-3 text-start">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-300 mb-1">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                  <span>{lang === 'ar' ? 'إضافة للشاشة الرئيسية كأيقونة تطبيق' : 'Add to Home Screen'}</span>
                 </div>
-                <Download className="h-4 w-4 text-white/50 group-hover:text-white shrink-0" />
-              </a>
-
-              {/* Option 3: Add via Pass2U on iOS */}
-              <a
-                href={`https://www.pass2u.net/d/${card.slug || 'card'}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-between rounded-xl border border-white/15 bg-white/5 p-3 text-white hover:bg-white/10 transition-colors group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 shrink-0">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div className="text-start">
-                    <div className="text-xs font-bold text-amber-300">
-                      {lang === 'ar' ? 'إضافة إلى المحفظة عبر Pass2U' : 'Add to Apple Wallet via Pass2U'}
-                    </div>
-                    <span className="text-[10px] text-white/60 block">
-                      {lang === 'ar' ? 'إضافة بطاقة المحفظة الرسمية لتطبيق Wallet على الآيفون.' : 'Adds official pass into Apple Wallet app directly.'}
-                    </span>
-                  </div>
-                </div>
-                <ExternalLink className="h-4 w-4 text-amber-400/70 group-hover:text-amber-400 shrink-0" />
-              </a>
+                <p className="text-[10px] text-white/70 leading-relaxed">
+                  {lang === 'ar'
+                    ? 'في متصفح سفاري: اضغط على زر المشاركة (Share ⎋) أسفل الشاشة، ثم اختر "إضافة إلى الصفحة الرئيسية" للوصول للبطاقة بضغطة زر دون إنترنت.'
+                    : 'In Safari: Tap the Share button (⎋) at the bottom, then select "Add to Home Screen" to install on iPhone.'}
+                </p>
+              </div>
             </div>
           </div>
 
