@@ -1,0 +1,12 @@
+[build]
+  command = "npx prisma generate && npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  DATABASE_URL = "file:./dev.db"
+  ENABLE_DEMO_MODE = "true"
+  NEXT_PUBLIC_DEFAULT_CURRENCY = "OMR"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

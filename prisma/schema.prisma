@@ -1,0 +1,559 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User Accounts
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  avatarUrl     String?
+  phone         String?
+  role          String    @default("ORGANIZATION_OWNER") // SUPER_ADMIN, ORGANIZATION_OWNER, ORGANIZATION_ADMIN, SALES_REP, CUSTOMER
+  isSuperAdmin  Boolean   @default(false)
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships   OrganizationMembership[]
+  assignedLeads Lead[]                    @relation("AssignedLeads")
+  leadActivities LeadActivity[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+}
+
+// Multi-Tenant Organizations
+model Organization {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  name            String
+  nameAr          String?
+  industry        String    @default("REAL_ESTATE") // REAL_ESTATE, HOSPITALITY, RETAIL, PROFESSIONAL_SERVICES, TOURISM, GENERAL
+  logoUrl         String?
+  coverUrl        String?
+  country         String    @default("Oman")
+  city            String    @default("Muscat")
+  commercialRegNo String?   // Omani CR number (سجل تجاري)
+  phone           String?
+  email           String?
+  website         String?
+  whatsapp        String?
+  description     String?
+  descriptionAr   String?
+  defaultLanguage String    @default("ar") // ar, en
+  currency        String    @default("OMR")
+  isVerified      Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  memberships     OrganizationMembership[]
+  profiles        BusinessProfile[]
+  cards           BusinessCard[]
+  campaigns       Campaign[]
+  qrCodes         QRCode[]
+  leads           Lead[]
+  appointments    AppointmentRequest[]
+  loyaltyPrograms LoyaltyProgram[]
+  analyticsEvents AnalyticsEvent[]
+  subscription    Subscription?
+  invoices        Invoice[]
+  auditLogs       AuditLog[]
+  branches        Branch[]
+  walletPasses    WalletPass[]
+}
+
+// Organization Branch / Location
+model Branch {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  nameAr          String?
+  city            String
+  address         String?
+  addressAr       String?
+  latitude        Float?
+  longitude       Float?
+  phone           String?
+  email           String?
+  isMainBranch    Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  cards           BusinessCard[]
+
+  @@index([organizationId])
+}
+
+// Organization Membership (RBAC)
+model OrganizationMembership {
+  id              String       @id @default(cuid())
+  userId          String
+  organizationId  String
+  role            String       @default("MEMBER") // OWNER, ADMIN, SALES_REP, MEMBER
+  title           String?      // Job title inside organization
+  status          String       @default("ACTIVE") // ACTIVE, INVITED, SUSPENDED
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+// Business Public Profile Page (/b/[slug])
+model BusinessProfile {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  headline        String?
+  headlineAr      String?
+  bio             String?
+  bioAr           String?
+  primaryColor    String       @default("#6317B5")
+  secondaryColor  String       @default("#00B6B2")
+  accentColor     String       @default("#E59F36")
+  themeStyle      String       @default("PREMIUM_MODERN") // PREMIUM_MODERN, MINIMALIST, LUXURY, EDITORIAL
+  openingHours    String?      // JSON string of weekly schedules
+  socialLinks     String?      // JSON string: { instagram, linkedin, twitter, snapchat, tiktok, facebook }
+  servicesJson    String?      // JSON array of service offerings
+  propertiesJson  String?      // JSON array of real estate projects / units
+  menuItemsJson   String?      // JSON array of menu / retail items
+  isPublished     Boolean      @default(true)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+// Digital Business Cards
+model BusinessCard {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId        String?
+  branch          Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  slug            String       @unique // public link: /c/[slug]
+  title           String       // Card display label (e.g. "Ahmed Al Balushi - Head of Sales")
+  ownerName       String
+  ownerNameAr     String?
+  jobTitle        String
+  jobTitleAr      String?
+  companyName     String
+  companyNameAr   String?
+  avatarUrl       String?
+  coverUrl        String?
+  logoUrl         String?
+  phone           String
+  secondaryPhone  String?
+  whatsapp        String
+  email           String
+  website         String?
+  locationText    String?
+  locationTextAr  String?
+  mapsUrl         String?
+  bio             String?
+  bioAr           String?
+  badgeText       String?      // e.g. "Verified Real Estate Agent"
+  theme           String       @default("navy-violet") // navy-violet, turquoise-amber, luxury-gold, royal-blue
+  primaryColor    String       @default("#181D48")
+  accentColor     String       @default("#00B6B2")
+  customActions   String?      // JSON array: [{ label, labelAr, url, icon, type }]
+  socialLinks     String?      // JSON: { linkedin, instagram, x, snapchat, tiktok }
+  qrCodeUrl       String?
+  isPrimary       Boolean      @default(false)
+  isPublished     Boolean      @default(true)
+  viewCount       Int          @default(0)
+  scanCount       Int          @default(0)
+  saveContactCount Int         @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  walletPasses    WalletPass[]
+  leads           Lead[]
+  qrCodes         QRCode[]
+  appointments    AppointmentRequest[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([organizationId])
+  @@index([slug])
+}
+
+// Wallet Passes (Apple Wallet & Google Wallet)
+model WalletPass {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cardId          String?
+  card            BusinessCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  passType        String        @default("BUSINESS_CARD") // BUSINESS_CARD, LOYALTY_CARD, EVENT_TICKET
+  platform        String        // APPLE, GOOGLE
+  serialNumber    String        @unique
+  passIdentifier  String?       // Apple passTypeIdentifier or Google classId
+  barcodeValue    String        // Encoded payload / verification URL
+  status          String        @default("ACTIVE") // ACTIVE, REVOKED, EXPIRED
+  isSimulated     Boolean       @default(false) // Sandbox / Demo flag
+  downloadCount   Int           @default(0)
+  lastIssuedAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([organizationId])
+  @@index([serialNumber])
+}
+
+// Smart QR Code Management
+model QRCode {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cardId          String?
+  card            BusinessCard? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  campaignId      String?
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  code            String        @unique // unique tracking code
+  name            String
+  targetUrl       String
+  styleConfig     String?       // JSON: { fgColor, bgColor, cornerStyle, logoUrl }
+  scanCount       Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([organizationId])
+  @@index([code])
+}
+
+// Campaigns & Marketing Attribution
+model Campaign {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  nameAr          String?
+  channel         String          @default("QR_PHYSICAL") // QR_PHYSICAL, EXHIBITION, WHATSAPP, EMAIL, SOCIAL, BROCHURE
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  scansCount      Int             @default(0)
+  leadsCount      Int             @default(0)
+  wonLeadsCount   Int             @default(0)
+  isActive        Boolean         @default(true)
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  qrCodes         QRCode[]
+  leads           Lead[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([organizationId])
+}
+
+// Leads & CRM Management
+model Lead {
+  id              String          @id @default(cuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cardId          String?
+  card            BusinessCard?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  campaignId      String?
+  campaign        Campaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  assignedToId    String?
+  assignedTo      User?           @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  name            String
+  phone           String
+  email           String?
+  source          String          @default("DIGITAL_CARD") // DIGITAL_CARD, QR_SCAN, PUBLIC_PROFILE, DIRECT, REFERRAL
+  stage           String          @default("NEW") // NEW, CONTACTED, QUALIFIED, APPOINTMENT_SCHEDULED, PROPOSAL_SENT, NEGOTIATION, WON, LOST
+  priority        String          @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  areaOfInterest  String?         // e.g. "Muscat Bay 2BR Villa", "Luxury Serviced Apartment", "Corporate Membership"
+  budgetRange     String?         // e.g. "50,000 - 80,000 OMR"
+  preferredContact String         @default("WHATSAPP") // WHATSAPP, PHONE, EMAIL
+  notes           String?
+  lostReason      String?         // PRICE, COMPETITOR, NO_RESPONSE, TIMING, OTHER
+  marketingConsent Boolean        @default(true)
+  dealValueOMR    Float?
+  followUpDate    DateTime?
+  convertedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  activities      LeadActivity[]
+  appointments    AppointmentRequest[]
+
+  @@index([organizationId])
+  @@index([stage])
+  @@index([phone])
+}
+
+// Lead Activity Timeline
+model LeadActivity {
+  id              String       @id @default(cuid())
+  leadId          String
+  lead            Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type            String       // STATUS_CHANGE, NOTE, CALL, WHATSAPP, EMAIL, APPOINTMENT, PROPOSAL
+  description     String
+  descriptionAr   String?
+  createdAt       DateTime     @default(now())
+
+  @@index([leadId])
+}
+
+// Appointment Bookings
+model AppointmentRequest {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cardId          String?
+  card            BusinessCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  leadId          String?
+  lead            Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  serviceName     String?
+  requestedTime   DateTime
+  status          String        @default("PENDING") // PENDING, CONFIRMED, COMPLETED, CANCELLED
+  location        String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([organizationId])
+}
+
+// Loyalty & Rewards Programs
+model LoyaltyProgram {
+  id              String         @id @default(cuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  nameAr          String?
+  type            String         @default("POINTS") // POINTS, STAMPS, TIERED, VIP_PASS
+  pointsPerOMR    Int            @default(10) // 10 points per 1 OMR spent
+  stampsRequired  Int            @default(8)  // If stamps mode
+  description     String?
+  descriptionAr   String?
+  terms           String?
+  termsAr         String?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  members         LoyaltyMember[]
+  rewards         Reward[]
+
+  @@index([organizationId])
+}
+
+// Loyalty Members
+model LoyaltyMember {
+  id              String         @id @default(cuid())
+  programId       String
+  program         LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  membershipNumber String        @unique // e.g. "WSL-OM-9821"
+  name            String
+  phone           String
+  email           String?
+  pointsBalance   Int            @default(0)
+  stampsBalance   Int            @default(0)
+  tier            String         @default("SILVER") // SILVER, GOLD, PLATINUM
+  totalSpentOMR   Float          @default(0)
+  joinedAt        DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  transactions    LoyaltyTransaction[]
+  redemptions     RewardRedemption[]
+
+  @@index([programId])
+  @@index([phone])
+}
+
+// Immutable Points / Stamps Ledger
+model LoyaltyTransaction {
+  id              String        @id @default(cuid())
+  memberId        String
+  member          LoyaltyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  type            String        // EARN, REDEEM, ADJUSTMENT, EXPIRY, BONUS
+  points          Int           @default(0)
+  stamps          Int           @default(0)
+  amountOMR       Float?
+  description     String
+  descriptionAr   String?
+  reference       String?       // Invoice / receipt reference
+  createdAt       DateTime      @default(now())
+
+  @@index([memberId])
+}
+
+// Reward Catalog
+model Reward {
+  id              String         @id @default(cuid())
+  programId       String
+  program         LoyaltyProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  title           String
+  titleAr         String?
+  description     String?
+  descriptionAr   String?
+  pointsRequired  Int            @default(100)
+  stampsRequired  Int            @default(0)
+  discountValue   Float?         // in OMR or %
+  discountType    String?        // PERCENT, FIXED_OMR, FREE_ITEM
+  stock           Int?           // null = unlimited
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  redemptions     RewardRedemption[]
+
+  @@index([programId])
+}
+
+// Reward Redemptions & Staff Validation
+model RewardRedemption {
+  id              String        @id @default(cuid())
+  rewardId        String
+  reward          Reward        @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  memberId        String
+  member          LoyaltyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  redemptionCode  String        @unique // unique QR token e.g. "RDM-7749-AB"
+  status          String        @default("PENDING") // PENDING, VERIFIED, EXPIRED, CANCELLED
+  verifiedBy      String?       // Staff user identifier
+  verifiedAt      DateTime?
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+
+  @@index([rewardId])
+  @@index([memberId])
+  @@index([redemptionCode])
+}
+
+// Analytics Events Stream
+model AnalyticsEvent {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cardId          String?
+  card            BusinessCard? @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  campaignId      String?
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  qrCodeId        String?
+  qrCode          QRCode?       @relation(fields: [qrCodeId], references: [id], onDelete: SetNull)
+  eventType       String        // PAGE_VIEW, QR_SCAN, VCARD_DOWNLOAD, WHATSAPP_CLICK, CALL_CLICK, INQUIRY_SUBMIT, WALLET_ADD_ATTEMPT, WALLET_ISSUED
+  device          String?       // MOBILE, DESKTOP, TABLET
+  browser         String?       // Safari, Chrome, etc.
+  country         String?       @default("OM")
+  city            String?       @default("Muscat")
+  ipHash          String?
+  referer         String?
+  createdAt       DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// Subscriptions & Plans
+model Plan {
+  id              String         @id @default(cuid())
+  code            String         @unique // FREE, BUSINESS, PROFESSIONAL, ENTERPRISE
+  name            String
+  nameAr          String
+  priceMonthlyOMR Float          @default(0)
+  priceYearlyOMR  Float          @default(0)
+  maxCards        Int            @default(1)
+  maxTeamMembers  Int            @default(1)
+  maxBranches     Int            @default(1)
+  featuresJson    String         // JSON list of features
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+
+  subscriptions   Subscription[]
+}
+
+model Subscription {
+  id              String       @id @default(cuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            Plan         @relation(fields: [planId], references: [id])
+  status          String       @default("ACTIVE") // ACTIVE, TRIALING, PAST_DUE, CANCELLED
+  billingInterval String       @default("MONTHLY") // MONTHLY, YEARLY
+  currentPeriodEnd DateTime
+  isSandbox       Boolean      @default(true) // Sandbox payment mode indicator
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  invoices        Invoice[]
+}
+
+model Invoice {
+  id              String        @id @default(cuid())
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId  String?
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoiceNumber   String        @unique // e.g. "INV-OM-2026-0042"
+  amountOMR       Float
+  currency        String        @default("OMR")
+  status          String        @default("PAID") // PAID, PENDING, FAILED
+  paymentMethod   String        @default("SANDBOX_CARD") // THAWANI, OMAN_NET, CREDIT_CARD, SANDBOX_CARD
+  paidAt          DateTime?
+  pdfUrl          String?
+  createdAt       DateTime      @default(now())
+
+  @@index([organizationId])
+}
+
+// In-App Notifications
+model Notification {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  titleAr         String?
+  message         String
+  messageAr       String?
+  type            String    @default("INFO") // INFO, LEAD_RECEIVED, APPOINTMENT_REQUEST, REWARD_REDEEMED, SYSTEM
+  link            String?
+  isRead          Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Enterprise Audit Logs
+model AuditLog {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action          String        // CARD_CREATED, LEAD_EXPORTED, PLAN_CHANGED, WALLET_ISSUED, SETTINGS_UPDATED
+  resource        String        // BusinessCard, Lead, Organization, etc.
+  resourceId      String?
+  detailsJson     String?
+  ipAddress       String?
+  createdAt       DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([createdAt])
+}
