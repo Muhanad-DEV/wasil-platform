@@ -7,7 +7,6 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
   try {
     let card: any = null;
 
-    // Attempt to query database
     try {
       card = await prisma.businessCard.findFirst({
         where: {
@@ -19,9 +18,20 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
       console.warn('[Apple Wallet API] Database query failed or unavailable, using fallback:', dbError);
     }
 
-    // If card not found in DB or DB unreachable, use fallback demo data
     if (!card) {
       card = getFallbackCard(params.cardId);
+    }
+
+    const searchParams = req.nextUrl.searchParams;
+    const isDirectDownload = searchParams.get('download') === '1' || searchParams.get('format') === 'pkpass';
+    const acceptHeader = req.headers.get('accept') || '';
+
+    // If an end-user navigates directly in Safari browser without explicit download intent,
+    // redirect them to the interactive card page with wallet modal open so Safari never throws
+    // the generic "Safari cannot download this file" rejection popup.
+    if (!isDirectDownload && acceptHeader.includes('text/html')) {
+      const targetSlug = card.slug || params.cardId;
+      return NextResponse.redirect(new URL(`/c/${targetSlug}?wallet=apple`, req.url));
     }
 
     const host = req.headers.get('host') || 'wasilom.netlify.app';
@@ -48,7 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
       type: 'BUSINESS_CARD',
     });
 
-    // Non-fatal recording in DB: analytics or pass record failure must NEVER block the pass download
+    // Non-fatal recording in DB
     try {
       if (card.organizationId) {
         await prisma.walletPass.upsert({
@@ -82,7 +92,6 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
         });
       }
     } catch (writeErr) {
-      // Intentionally non-fatal in serverless / read-only SQLite environments
       console.warn('[Apple Wallet API] Non-fatal pass registration write skipped:', writeErr);
     }
 
@@ -95,8 +104,6 @@ export async function GET(req: NextRequest, { params }: { params: { cardId: stri
         'Content-Disposition': `attachment; filename="${fileName}"`,
         'X-Wasil-Wallet-Simulated': isSimulated ? 'true' : 'false',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
       },
     });
   } catch (error: any) {

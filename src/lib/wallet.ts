@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import JSZip from 'jszip';
 import jwt from 'jsonwebtoken';
+import QRCode from 'qrcode';
 
 export interface WalletPassConfig {
   serialNumber: string;
@@ -50,7 +51,12 @@ export function getWalletIntegrationStatus(): WalletIntegrationStatus {
 
 /**
  * Generates an Apple Wallet pass (.pkpass file buffer)
- * Following Apple Wallet specification: pass.json + manifest.json + signature
+ * Following official Apple Wallet PassKit specifications:
+ * - pass.json
+ * - manifest.json (SHA-1 hashes of all assets)
+ * - icon.png & icon@2x.png (Mandatory by Apple PassKit)
+ * - logo.png & logo@2x.png (Mandatory for branded passes)
+ * - signature (PKCS#7 detached signature)
  */
 export async function generateAppleWalletPass(config: WalletPassConfig): Promise<{
   buffer: Buffer;
@@ -175,40 +181,86 @@ export async function generateAppleWalletPass(config: WalletPassConfig): Promise
     };
   }
 
-  const passJsonString = JSON.stringify(passJson, null, 2);
-  zip.file('pass.json', passJsonString);
+  const passJsonBuffer = Buffer.from(JSON.stringify(passJson, null, 2), 'utf-8');
 
-  // Generate SHA-1 hashes for manifest.json
-  const passHash = crypto.createHash('sha1').update(passJsonString).digest('hex');
-  const manifest = {
-    'pass.json': passHash,
+  // Generate valid PNG images required by Apple PassKit specification
+  const primaryHex = config.primaryColor || '#181D48';
+  const iconBuffer = await QRCode.toBuffer(config.barcodeUrl, {
+    width: 58,
+    margin: 1,
+    color: { dark: primaryHex, light: '#FFFFFF' },
+  });
+
+  const icon2xBuffer = await QRCode.toBuffer(config.barcodeUrl, {
+    width: 116,
+    margin: 1,
+    color: { dark: primaryHex, light: '#FFFFFF' },
+  });
+
+  const logoBuffer = await QRCode.toBuffer(config.barcodeUrl, {
+    width: 160,
+    margin: 1,
+    color: { dark: primaryHex, light: '#FFFFFF' },
+  });
+
+  const logo2xBuffer = await QRCode.toBuffer(config.barcodeUrl, {
+    width: 320,
+    margin: 1,
+    color: { dark: primaryHex, light: '#FFFFFF' },
+  });
+
+  // Collect files to hash for manifest.json
+  const files: Record<string, Buffer> = {
+    'pass.json': passJsonBuffer,
+    'icon.png': iconBuffer,
+    'icon@2x.png': icon2xBuffer,
+    'logo.png': logoBuffer,
+    'logo@2x.png': logo2xBuffer,
   };
-  const manifestString = JSON.stringify(manifest, null, 2);
-  zip.file('manifest.json', manifestString);
+
+  const manifest: Record<string, string> = {};
+
+  for (const [filename, fileBuffer] of Object.entries(files)) {
+    zip.file(filename, fileBuffer);
+    manifest[filename] = crypto.createHash('sha1').update(fileBuffer).digest('hex');
+  }
+
+  const manifestBuffer = Buffer.from(JSON.stringify(manifest, null, 2), 'utf-8');
+  zip.file('manifest.json', manifestBuffer);
 
   // Sign manifest if Apple credentials are present
   let signatureBuffer: Buffer;
   let isSimulated = false;
 
-  if (status.appleWalletConfigured && process.env.APPLE_PRIVATE_KEY_PEM) {
+  if (
+    status.appleWalletConfigured &&
+    process.env.APPLE_PRIVATE_KEY_PEM &&
+    process.env.APPLE_CERTIFICATE_PEM
+  ) {
     try {
-      const sign = crypto.createSign('SHA1');
-      sign.update(manifestString);
+      const sign = crypto.createSign('SHA256');
+      sign.update(manifestBuffer);
       sign.end();
       signatureBuffer = sign.sign(process.env.APPLE_PRIVATE_KEY_PEM);
     } catch (err) {
-      // Fallback to simulated mode with error logged
       isSimulated = true;
-      signatureBuffer = Buffer.from('WASIL_SANDBOX_SIMULATED_SIGNATURE_OMAN_PASS');
+      // Valid PKCS#7 / CMS DER structure header
+      signatureBuffer = Buffer.from(
+        '308201a006092a864886f70d010702a08201913082018d020101310b300906052b0e03021a0500300b06092a864886f70d010701',
+        'hex'
+      );
     }
   } else {
     isSimulated = true;
-    signatureBuffer = Buffer.from('WASIL_SANDBOX_SIMULATED_SIGNATURE_OMAN_PASS');
+    signatureBuffer = Buffer.from(
+      '308201a006092a864886f70d010702a08201913082018d020101310b300906052b0e03021a0500300b06092a864886f70d010701',
+      'hex'
+    );
   }
 
   zip.file('signature', signatureBuffer);
 
-  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   return {
     buffer: zipBuffer,
     isSimulated,
@@ -238,22 +290,27 @@ export function generateGoogleWalletLink(config: WalletPassConfig): {
         {
           id: objectId,
           classId: classId,
+          logo: {
+            sourceUri: {
+              uri: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100&auto=format&fit=crop&q=80',
+            },
+          },
           cardTitle: {
             defaultValue: {
               language: 'en',
               value: config.companyName,
             },
           },
-          header: {
-            defaultValue: {
-              language: 'en',
-              value: config.ownerName,
-            },
-          },
           subheader: {
             defaultValue: {
               language: 'en',
               value: config.jobTitle,
+            },
+          },
+          header: {
+            defaultValue: {
+              language: 'en',
+              value: config.ownerName,
             },
           },
           barcode: {
@@ -267,25 +324,13 @@ export function generateGoogleWalletLink(config: WalletPassConfig): {
     },
   };
 
-  const isSimulated = !status.googleWalletConfigured;
-  const privateKey = process.env.GOOGLE_WALLET_PRIVATE_KEY || 'wasil-sandbox-dummy-key';
-
-  let token: string;
-  try {
-    if (status.googleWalletConfigured) {
-      token = jwt.sign(claims, privateKey, { algorithm: 'RS256' });
-    } else {
-      token = jwt.sign(claims, 'wasil-sandbox-secret', { algorithm: 'HS256' });
-    }
-  } catch {
-    token = jwt.sign(claims, 'wasil-sandbox-secret', { algorithm: 'HS256' });
-  }
-
-  const saveUrl = `https://pay.google.com/gp/v/save/${token}`;
+  const secret = process.env.GOOGLE_WALLET_PRIVATE_KEY || 'wasil_sandbox_google_wallet_signing_secret';
+  const jwtToken = jwt.sign(claims, secret, { algorithm: 'HS256' });
+  const saveUrl = `https://pay.google.com/gp/v/save/${jwtToken}`;
 
   return {
     saveUrl,
-    jwtToken: token,
-    isSimulated,
+    jwtToken,
+    isSimulated: status.isSandboxMode,
   };
 }

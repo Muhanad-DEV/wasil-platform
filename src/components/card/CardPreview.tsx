@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import {
   Phone,
@@ -19,6 +19,8 @@ import {
   Check,
   Smartphone,
   Copy,
+  X,
+  Sparkles,
 } from 'lucide-react';
 
 export interface CardPreviewData {
@@ -58,6 +60,13 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
   const { lang, t, isRtl } = useLanguage();
   const [copied, setCopied] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showAppleWalletModal, setShowAppleWalletModal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('wallet=apple')) {
+      setShowAppleWalletModal(true);
+    }
+  }, []);
 
   const displayName = lang === 'ar' && card.ownerNameAr ? card.ownerNameAr : card.ownerName;
   const displayTitle = lang === 'ar' && card.jobTitleAr ? card.jobTitleAr : card.jobTitle;
@@ -235,13 +244,14 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
         {/* Add to Apple Wallet & Google Wallet Buttons */}
         <div className="mt-2.5 grid grid-cols-2 gap-2">
           {/* Apple Wallet */}
-          <a
-            href={`/api/wallet/apple/${card.id || card.slug}`}
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-black py-2.5 px-3 text-[11px] font-semibold text-white shadow hover:bg-neutral-900 transition-colors"
+          <button
+            type="button"
+            onClick={() => setShowAppleWalletModal(true)}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-black py-2.5 px-3 text-[11px] font-semibold text-white shadow hover:bg-neutral-900 transition-colors cursor-pointer"
           >
             <span className="text-sm"></span>
             <span>Apple Wallet</span>
-          </a>
+          </button>
 
           {/* Google Wallet */}
           <a
@@ -317,6 +327,150 @@ export function CardPreview({ card, isStandalone = false }: CardPreviewProps) {
           >
             {lang === 'ar' ? 'إغلاق' : 'Close'}
           </button>
+        </div>
+      )}
+
+      {/* Apple Wallet & iPhone Pass Modal */}
+      {showAppleWalletModal && (
+        <div className="absolute inset-0 z-40 flex flex-col justify-between bg-slate-950/95 backdrop-blur-md p-5 text-white animate-fadeIn overflow-y-auto text-start">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg"></span>
+              <span className="text-xs font-extrabold tracking-wide">
+                {lang === 'ar' ? 'إضافة إلى محفظة Apple والآيفون' : 'Add to Apple Wallet & iPhone'}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowAppleWalletModal(false)}
+              className="rounded-full bg-white/10 p-1.5 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Pass Card Preview Mockup */}
+          <div className="my-auto py-3">
+            <div
+              className="rounded-2xl p-4 shadow-xl border border-white/15 text-start space-y-3 relative overflow-hidden"
+              style={{
+                background: `linear-gradient(135deg, ${primaryColor} 0%, #0d0f22 100%)`,
+              }}
+            >
+              <div className="flex items-center justify-between text-[11px] text-white/80">
+                <span className="font-bold flex items-center gap-1.5">
+                  <span> Wallet Pass</span>
+                </span>
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-400 border border-emerald-500/30">
+                  {lang === 'ar' ? 'سلطنة عُمان' : 'Oman ID'}
+                </span>
+              </div>
+
+              <div>
+                <h4 className="text-base font-black text-white">{displayName}</h4>
+                <p className="text-[11px] text-wasil-turquoise font-semibold">{displayTitle}</p>
+                <p className="text-[10px] text-white/70">{displayCompany}</p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                <div className="text-[10px] text-white/60 space-y-0.5">
+                  <div>{card.phone}</div>
+                  <div>{card.email}</div>
+                </div>
+                <div className="h-14 w-14 bg-white p-1 rounded-xl shadow shrink-0">
+                  <img
+                    src={`/api/cards/${card.id || card.slug}/qr?format=png`}
+                    alt="Pass QR"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Smart Actions List */}
+            <div className="mt-4 space-y-2">
+              {/* Option 1: Native 1-Tap iOS Contact Card (Opens native Apple Contacts sheet) */}
+              <a
+                href={`/api/cards/${card.id || card.slug}/vcard`}
+                download
+                className="w-full flex items-center justify-between rounded-xl bg-wasil-violet p-3 text-white hover:bg-wasil-violet/90 transition-all shadow-md group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20 text-white shrink-0">
+                    <Smartphone className="h-4 w-4" />
+                  </div>
+                  <div className="text-start">
+                    <div className="text-xs font-black flex items-center gap-1.5">
+                      <span>{lang === 'ar' ? 'حفظ جهة الاتصال في الآيفون (موصى به)' : 'Save to iPhone Contacts (1-Tap)'}</span>
+                      <span className="rounded bg-emerald-400 text-slate-900 text-[8px] font-black px-1.5 py-0.2 uppercase">
+                        {lang === 'ar' ? 'فوري' : 'Instant'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/80 block">
+                      {lang === 'ar'
+                        ? 'يفتح بطاقة الآيفون الرسمية لحفظ الاسم، الهاتف، الواتساب والبريد.'
+                        : 'Opens native iOS Contact card to save number, photo, and WhatsApp.'}
+                    </span>
+                  </div>
+                </div>
+                <Download className="h-4 w-4 text-white/70 group-hover:text-white shrink-0" />
+              </a>
+
+              {/* Option 2: Apple Wallet direct .pkpass file */}
+              <a
+                href={`/api/wallet/apple/${card.id || card.slug}?download=1`}
+                download
+                className="w-full flex items-center justify-between rounded-xl border border-white/20 bg-white/5 p-3 text-white hover:bg-white/10 transition-colors group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white shrink-0">
+                    <span className="text-base font-bold"></span>
+                  </div>
+                  <div className="text-start">
+                    <div className="text-xs font-bold">
+                      {lang === 'ar' ? 'تحميل بطاقة Wallet المباشرة (.pkpass)' : 'Download .pkpass Wallet File'}
+                    </div>
+                    <span className="text-[10px] text-white/60 block">
+                      {lang === 'ar' ? 'حفظ الملف في تطبيق الملفات (Files) أو مشاركته.' : 'Save to Files app or AirDrop to Mac/iPad.'}
+                    </span>
+                  </div>
+                </div>
+                <Download className="h-4 w-4 text-white/50 group-hover:text-white shrink-0" />
+              </a>
+
+              {/* Option 3: Add via Pass2U on iOS */}
+              <a
+                href={`https://www.pass2u.net/d/${card.slug || 'card'}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-between rounded-xl border border-white/15 bg-white/5 p-3 text-white hover:bg-white/10 transition-colors group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400 shrink-0">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="text-start">
+                    <div className="text-xs font-bold text-amber-300">
+                      {lang === 'ar' ? 'إضافة إلى المحفظة عبر Pass2U' : 'Add to Apple Wallet via Pass2U'}
+                    </div>
+                    <span className="text-[10px] text-white/60 block">
+                      {lang === 'ar' ? 'إضافة بطاقة المحفظة الرسمية لتطبيق Wallet على الآيفون.' : 'Adds official pass into Apple Wallet app directly.'}
+                    </span>
+                  </div>
+                </div>
+                <ExternalLink className="h-4 w-4 text-amber-400/70 group-hover:text-amber-400 shrink-0" />
+              </a>
+            </div>
+          </div>
+
+          <div className="pt-2 text-center">
+            <button
+              onClick={() => setShowAppleWalletModal(false)}
+              className="text-xs font-semibold text-white/60 hover:text-white transition-colors"
+            >
+              {lang === 'ar' ? 'إغلاق والعودة للبطاقة' : 'Close and return to card'}
+            </button>
+          </div>
         </div>
       )}
     </div>
